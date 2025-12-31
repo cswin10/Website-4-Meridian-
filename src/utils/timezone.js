@@ -188,3 +188,40 @@ export function getLocalTime() {
     hour12: false,
   }).format(new Date());
 }
+
+/**
+ * Get the selected time (local time + offset) formatted as HH:MM
+ * @param {number} offsetHours - Hours offset from current time
+ * @returns {string} Formatted time string
+ */
+export function getSelectedTime(offsetHours = 0) {
+  const now = new Date();
+  now.setTime(now.getTime() + offsetHours * 60 * 60 * 1000);
+
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now);
+}
+
+/**
+ * Find the offset that gives maximum work hours overlap
+ * @param {Array} cities - Array of city objects with timezone property
+ * @returns {Object} { offset: number, count: number }
+ */
+export function findBestOffset(cities) {
+  let bestOffset = 0;
+  let maxCount = 0;
+
+  // Check each hour offset from -12 to +12
+  for (let offset = -12; offset <= 12; offset++) {
+    const count = calculateOverlap(cities, offset);
+    if (count > maxCount) {
+      maxCount = count;
+      bestOffset = offset;
+    }
+  }
+
+  return { offset: bestOffset, count: maxCount };
+}
