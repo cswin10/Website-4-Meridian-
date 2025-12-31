@@ -40,7 +40,7 @@ function App() {
 
       {/* Time Slider */}
       <div className="time-slider-container">
-        <TimeSlider offset={sliderOffset} onChange={setSliderOffset} />
+        <TimeSlider offset={sliderOffset} onChange={setSliderOffset} cities={cities} />
         <OverlapIndicator cities={cities} offsetHours={sliderOffset} />
       </div>
 

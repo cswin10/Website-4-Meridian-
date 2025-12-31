@@ -1,8 +1,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { useTime } from '../hooks/useTime';
+import { getSelectedTime, findBestOffset } from '../utils/timezone';
 
-export function TimeSlider({ offset, onChange }) {
+export function TimeSlider({ offset, onChange, cities }) {
   const trackRef = useRef(null);
+  const containerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Trigger re-render every second for live time display
+  useTime();
 
   const updateOffset = useCallback((clientX) => {
     const track = trackRef.current;
@@ -27,6 +33,38 @@ export function TimeSlider({ offset, onChange }) {
     setIsDragging(true);
     updateOffset(e.touches[0].clientX);
   };
+
+  const handleDoubleClick = () => {
+    onChange(0);
+  };
+
+  const handleFindBest = () => {
+    if (cities && cities.length > 0) {
+      const { offset: bestOffset } = findBestOffset(cities);
+      onChange(bestOffset);
+    }
+  };
+
+  // Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only handle if not in an input field
+      if (e.target.tagName === 'INPUT') return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onChange(Math.max(-12, offset - 1));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        onChange(Math.min(12, offset + 1));
+      } else if (e.key === 'Escape' || e.key === '0') {
+        onChange(0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [offset, onChange]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -61,26 +99,34 @@ export function TimeSlider({ offset, onChange }) {
   // Convert offset to position (0 = -12h, 50% = 0h, 100% = +12h)
   const handlePosition = ((offset + 12) / 24) * 100;
 
-  // Format offset display
-  const offsetDisplay = offset === 0
-    ? 'Current time'
-    : offset > 0
-      ? `+${offset} hours`
-      : `${offset} hours`;
+  // Get the actual selected time
+  const selectedTime = getSelectedTime(offset);
 
-  // Hour markers (-12 to +12)
-  const hours = [];
-  for (let i = -12; i <= 12; i += 3) {
-    hours.push(i);
-  }
+  // Format offset display
+  const offsetLabel = offset === 0
+    ? 'now'
+    : offset > 0
+      ? `+${offset}h`
+      : `${offset}h`;
 
   return (
-    <div className="time-slider-wrapper">
+    <div className="time-slider-wrapper" ref={containerRef}>
       <div className="time-slider-header">
-        <span className="time-slider-title">Meeting Time Finder</span>
-        <span className={`time-slider-offset ${offset < 0 ? 'past' : ''}`}>
-          {offsetDisplay}
-        </span>
+        <div className="time-slider-left">
+          <span className="time-slider-title">Meeting Time Finder</span>
+          <span className="time-slider-hint">Use arrow keys or drag</span>
+        </div>
+        <div className="time-slider-right">
+          <div className="time-slider-selected-time">
+            <span className="selected-time-value">{selectedTime}</span>
+            <span className="selected-time-label">{offsetLabel}</span>
+          </div>
+          {cities && cities.length > 1 && (
+            <button className="time-slider-find-best" onClick={handleFindBest}>
+              Find Best
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -88,13 +134,30 @@ export function TimeSlider({ offset, onChange }) {
         className="time-slider-track"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
+        onDoubleClick={handleDoubleClick}
+        tabIndex={0}
+        role="slider"
+        aria-valuenow={offset}
+        aria-valuemin={-12}
+        aria-valuemax={12}
+        aria-label="Time offset in hours"
       >
-        {/* Hour markers */}
-        <div className="time-slider-hours">
-          {hours.map((h, i) => (
-            <div key={h} className="time-slider-hour">
-              {h === 0 ? '0' : h > 0 ? `+${h}` : h}
-            </div>
+        {/* Hour tick marks */}
+        <div className="time-slider-ticks">
+          {Array.from({ length: 25 }, (_, i) => i - 12).map((h) => (
+            <div
+              key={h}
+              className={`time-slider-tick ${h === 0 ? 'zero' : ''} ${h % 3 === 0 ? 'major' : ''}`}
+            />
+          ))}
+        </div>
+
+        {/* Hour labels */}
+        <div className="time-slider-labels">
+          {[-12, -6, 0, 6, 12].map((h) => (
+            <span key={h} className={`time-slider-label ${h === 0 ? 'zero' : ''}`}>
+              {h === 0 ? 'NOW' : h > 0 ? `+${h}h` : `${h}h`}
+            </span>
           ))}
         </div>
 
@@ -106,20 +169,17 @@ export function TimeSlider({ offset, onChange }) {
           className="time-slider-handle"
           style={{ left: `${handlePosition}%` }}
         />
-
-        {/* Reset button */}
-        {offset !== 0 && (
-          <button
-            className="time-slider-reset"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange(0);
-            }}
-          >
-            Reset
-          </button>
-        )}
       </div>
+
+      {/* Reset button - outside track */}
+      {offset !== 0 && (
+        <button
+          className="time-slider-reset"
+          onClick={() => onChange(0)}
+        >
+          Reset to Now
+        </button>
+      )}
     </div>
   );
 }
